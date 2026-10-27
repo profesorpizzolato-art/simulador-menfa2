@@ -1,0 +1,705 @@
+import streamlit as st
+from fpdf import FPDF
+import datetime
+
+class MENFA_Manual(FPDF):
+    def header(self):
+        try:
+            # Centrar el logo: (210mm ancho A4 - 33mm logo) / 2 = 88.5mm
+            self.image('logo_menfa.png', 88.5, 8, 33)
+        except:
+            pass
+        
+        # Bajamos el cursor 35mm para que el texto empiece debajo del logo
+        self.ln(35) 
+        self.set_font('Arial', 'B', 10)
+        self.set_text_color(100, 100, 100)
+        self.cell(0, 10, 'MENFA CAPACITACIONES - MENDOZA, ARGENTINA', 0, 1, 'C')
+        self.ln(5)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.set_text_color(128, 128, 128)
+        self.cell(0, 10, f'Pagina {self.page_no()} | Manual Maestro de Perforacion 3.0', 0, 0, 'C')
+
+    def multi_cell(self, *args, **kwargs):
+        try:
+            return super().multi_cell(*args, new_x="LMARGIN", new_y="NEXT", **kwargs)
+        except TypeError:  # versiones viejas de fpdf2 sin new_x/new_y
+            return super().multi_cell(*args, **kwargs)
+
+
+def generar_manual_completo():
+    pdf = MENFA_Manual()
+    # Definimos margenes de 20mm (2cm) a cada lado para centrar el bloque de contenido
+    pdf.set_left_margin(20)
+    pdf.set_right_margin(20)
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # =========================================================================
+    # --- 1. PORTADA ---
+    # =========================================================================
+    pdf.add_page()
+    pdf.ln(60)
+    pdf.set_font('Arial', 'B', 32)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 20, "MANUAL MAESTRO", 0, 1, 'C')
+    pdf.set_font('Arial', 'B', 18)
+    pdf.cell(0, 10, "PERFORACION, CONTROL DE POZOS Y GEONAVEGACION", 0, 1, 'C')
+    pdf.ln(10)
+    pdf.set_font('Arial', '', 12)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 10, "Edicion Especial 2026", 0, 1, 'C')
+    pdf.ln(50)
+    pdf.set_font('Arial', 'I', 10)
+    pdf.multi_cell(0, 7, "Material educativo desarrollado para la formacion de Tecnicos Superiores en Petroleo.\nMendoza, Argentina.", align='C')
+
+    # =========================================================================
+    # --- 2. GLOSARIO ---
+    # =========================================================================
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "1. GLOSARIO TECNICO PROFESIONAL", 0, 1, 'C')
+    pdf.ln(5)
+    pdf.set_text_color(0, 0, 0)
+    
+    glosario = [
+        ("BHA (Bottom Hole Assembly)", "Conjunto de herramientas al final de la sarta (mecha, portamechas, estabilizadores)."),
+        ("WOB (Weight on Bit)", "Carga aplicada a la mecha para lograr la penetracion de la roca."),
+        ("KICK", "Entrada imprevista de fluidos de la formacion (gas o petroleo) al pozo."),
+        ("MAASP", "Maxima presion anular superficial permitida antes de fracturar el zapato de la caneria."),
+        ("ECD (Equivalent Circulating Density)", "Densidad real que siente el fondo del pozo sumando la friccion anular."),
+        ("STUCK PIPE", "Atrapamiento de la sarta por causas mecanicas o presiones diferenciales."),
+        ("SWABBING", "Efecto de succion al sacar la herramienta muy rapido, causa principal de surgencias."),
+        ("PORE PRESSURE", "Presion natural de los fluidos dentro de la roca (Presion de Poros).")
+    ]
+    for term, desc in glosario:
+        pdf.set_font('Arial', 'B', 11)
+        pdf.cell(0, 7, f"- {term}:", 0, 1) 
+        pdf.set_font('Arial', '', 10)
+        pdf.multi_cell(0, 6, desc, align='J') 
+        pdf.ln(2)
+
+    # =========================================================================
+    # --- 3. NAVEGACIÓN Y GEONAVEGACIÓN ---
+    # =========================================================================
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "2. NAVEGACION Y GEONAVEGACION AVANZADA", 0, 1, 'L')
+    pdf.ln(5)
+    
+    # Modo Rotación
+    pdf.set_font('Arial', 'B', 12)
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 7, "Modo Rotacion (Conventional Rotary Drilling):", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    rot_text = ("Se activa cuando el Top Drive o la mesa rotaria transmiten energia mecanica directa a toda la sarta (RPM > 0). Las fuerzas laterales en la mecha se promedian geometricamente en 360 grados, por lo que el pozo tiende de forma natural a mantener el rumbo y azimut actual. Dependiendo de la rigidez del BHA, puede existir una leve deriva por gravedad.")
+    pdf.multi_cell(0, 6, rot_text, align='J')
+    pdf.ln(4)
+
+    # Modo Deslizando
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 7, "Modo Deslizando (Sliding Drill Mode):", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    slide_text = ("Ocurre cuando la sarta se mantiene fija sin rotacion superficial (RPM = 0) y el avance es comandado por la fuerza hidraulica sobre un motor de fondo (PDM). La orientacion del Bent Housing dicta la trayectoria del pozo mediante el Toolface (TF):\n"
+                  "  - Toolface a 0 GRAD (High Side): Produce un incremento agresivo de inclinacion (Build Rate).\n"
+                  "  - Toolface a 180 GRAD (Low Side): Produce una caida controlada del angulo de inclinacion (Drop Rate).\n"
+                  "  - Toolface a 90 o 270 GRAD: Modifica directamente el Azimut (giros hacia el Este u Oeste).\n"
+                  "Formula Matematica de Cambio: Delta Angulo = (DLS_set / 30) x Delta Profundidad.")
+    pdf.multi_cell(0, 6, slide_text, align='J')
+    pdf.ln(4)
+
+    # DLS
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 7, "DLS (Dogleg Severity) e Impacto Mecanico:", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    dls_text = ("Mide la severidad del cambio de direccion total en un intervalo de 30 metros. Un DLS > 4.0 se considera una curva agresiva que genera una flexion severa en el acero. Esto aumenta de forma exponencial el torque de friccion y las fuerzas de arrastre (Drag) durante las maniobras, incrementando el riesgo critico de aprisionamiento mecanico (Keyseating).")
+    pdf.multi_cell(0, 6, dls_text, align='J')
+
+    # =========================================================================
+    # --- 4. HIDRÁULICA Y SARTA ---
+    # =========================================================================
+    pdf.ln(5)
+    pdf.set_font('Arial', 'B', 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "3. HIDRAULICA Y MECANICA DE LA SARTA (API 5DP)", 0, 1, 'L')
+    pdf.ln(5)
+    pdf.set_text_color(0, 0, 0)
+    
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 6, "- ECD (Equivalent Circulating Density):", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    pdf.multi_cell(0, 6, "Es la densidad efectiva total que experimenta la formacion en el fondo del pozo. Suma la presion hidrostatica estatica del fluido mas las perdidas de presion por friccion en el espacio anular causadas por la circulacion de las bombas. Aumenta al encender las bombas y cae al apagarlas.", align='J')
+    pdf.ln(2)
+
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 6, "- BHP (Bottom Hole Pressure) vs Presion de Poros:", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    pdf.multi_cell(0, 6, "Es la presion real en el fondo del pozo (BHP = 0.052 x ECD x TVD). Actua como nuestra barrera primaria de control de pozos. Debe mantenerse estrictamente superior a la presion de poros para evitar el ingreso de fluidos de la roca (KICK), pero inferior a la presion de fractura.", align='J')
+    pdf.ln(2)
+
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 6, "- Trip Tank y Ley de Desplazamiento:", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    pdf.multi_cell(0, 6, "Tanque auxiliar de precision calibrada utilizado para medir el volumen de lodo exacto desplazado por el volumen de acero al sacar o meter sarta en el pozo. Si el pozo requiere menos volumen de lodo que el calculado teoricamente al extraer tubos, se asume el ingreso de una arremetida.", align='J')
+    pdf.ln(2)
+
+    pdf.set_font('Arial', 'B', 11)
+    pdf.cell(0, 6, "- Mecanica del Gancho (Hook Load, WOB, MOP y Flotacion):", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    mecanica_text = ("- Factor de Flotacion (FF): El lodo ejerce un empuje vertical hacia arriba que reduce el peso aparente del acero. Formula: FF = 1 - (Densidad Lodo / 65.5).\n"
+                     "- Hook Load: Carga medida en el gancho. Al apoyar peso sobre la mecha (WOB), el fondo absorbe fuerza y el Hook Load disminuye: Hook Load = (Peso Aire x FF) - WOB.\n"
+                     "- Margen de Overpull (MOP): Fuerza de tension disponible antes de superar el limite elastico de deformacion del acero estipulado por la norma API 5DP.")
+    pdf.multi_cell(0, 6, mecanica_text, align='J')
+
+    # =========================================================================
+    # --- 5. CONTROL DE POZOS (BOP) ---
+    # =========================================================================
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "4. CONTROL DE POZOS Y EQUIPOS DE SUPERFICIE (BOP)", 0, 1, 'L')
+    pdf.ln(5)
+    pdf.set_text_color(0, 0, 0)
+    
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 7, "Cierre de Pozo (Shut-In Protocol):", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    shut_text = ("Ante variaciones o aumentos anomalos en el nivel de las piletas (Pit Gain), el pozo debe aislarse de inmediato activando hidraulicamente las valvulas del BOP (Preventor Anular o Ram de Tuberia). El confinamiento genera la transmision de presiones estabilizadas hacia la superficie, registrandose en la tuberia (SIDPP) y en el espacio anular (SICP).")
+    pdf.multi_cell(0, 6, shut_text, align='J')
+    pdf.ln(4)
+
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(0, 7, "Uso del Choke Manifold y Backpressure:", 0, 1)
+    pdf.set_font('Arial', '', 10)
+    choke_text = ("Durante la circulacion y ahogo de un pozo, el fluido no puede salir de forma libre. Se utiliza el Choke Manifold regulando la apertura de las agujas (medida en fracciones de 1/64 de pulgada). Al restringir la salida abriendo menos el estrangulador, se genera una Contrapresion (Backpressure) que se transmite al fondo para mantener la BHP constante e igual a la presion de formacion mientras se desplaza el influjo.")
+    pdf.multi_cell(0, 6, choke_text, align='J')
+
+    # =========================================================================
+    # --- 6. PROTOCOLOS DE SEGURIDAD (CON PROCEDIMIENTOS UNIFICADOS) ---
+    # =========================================================================
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "5. PROTOCOLOS DE SEGURIDAD OPERATIVA INTERNACIONAL", 0, 1, 'C')
+    pdf.ln(5)
+    pdf.set_text_color(0, 0, 0)
+
+    procedimientos = [
+        ("DETECCION DE SURGENCIAS (KICK DETECTION)", 
+         "1. Monitoreo de Piletas: Todo aumento en tanques > 5 bbl (Pit Gain) es una alarma critica mandatoria.\n"
+         "2. Flow Check: Levanta herramienta, apaga bombas y observa la linea de retorno (Flowline). Si fluye sola, se confirma la surgencia."),
+        
+        ("CIERRE DURO (HARD SHUT-IN METHOD)", 
+         "1. Espaciar: Levantar la sarta para asegurar que ninguna junta de conexion (tool joint) quede frente a los arietes del BOP.\n"
+         "2. Parar: Apagar las bombas de perforacion de inmediato y frenar la mesa rotaria.\n"
+         "3. Cerrar: Accionar hidraulicamente el Preventor (BOP) y abrir la valvula hidraulica de la linea de Choke (HCR).\n"
+         "4. Registrar: Anotar las presiones estabilizadas SIDPP y SICP despues de 5 a 10 minutos de estabilizacion."),
+        
+        ("MANIOBRAS DE SACADA Y VIAJES (TRIPPING)", 
+         "1. Hoja de Llenado: Controlar y registrar obligatoriamente el volumen inyectado por el Trip Tank cada 5 tiros extraidos.\n"
+         "2. Swabbing: Monitorear la velocidad de sacada para evitar el efecto de succion o pistoneo en zonas arcillosas.\n"
+         "3. Valvula TIW: Mantener siempre una valvula de seguridad de apertura completa abierta en la boca de pozo lista para conectar."),
+        
+        ("SEGURIDAD INDUSTRIAL EN BOCA DE POZO", 
+         "1. Zonas de Peligro: Prohibido transitar o permanecer bajo la trayectoria del bloque viajero.\n"
+         "2. LOTO: Implementacion estricta de Bloqueo y Etiquetado en los motores y mandos antes del mantenimiento de bombas.\n"
+         "3. Comunicacion: Uso exclusivo de senales manuales estandarizadas entre el Perforador y el Enganchador."),
+        
+        ("PEGADO DE SARTA POR PRESION DIFERENCIAL", 
+         "1. Diagnostico: Perdida de movimiento vertical y rotacion con circulacion totalmente libre.\n"
+         "2. Accion Fisica: Aplicar torque maximo a la izquierda y asentar/tensionar segun el sentido del viaje.\n"
+         "3. Quimica: Bombear una pildora de liberacion (Spotting Fluid) para ablandar el revoque de lodo.\n"
+         "4. Mecanica: Activar los martillos (Jars) golpeando en direccion contraria al pegamiento."),
+        
+        ("CONTROL DE PISTONEO Y SUCCION (SWABBING/SURGING)", 
+         "1. Velocidad de Viaje: Limitar estrictamente la velocidad de maniobra (ej: maximo 25 seg por tiro).\n"
+         "2. Verificacion: Realizar un Short Trip (bomba corta) de 5 a 10 tiros antes de salir por completo a superficie.\n"
+         "3. Reologia: Mantener las fuerzas de gel y viscosidad controladas para evitar efectos de embolo."),
+        
+        ("PERDIDA TOTAL DE CIRCULACION (LOST CIRCULATION)", 
+         "1. Mantener Columna: Detener perforacion, levantar sarta y llenar el espacio anular por linea auxiliar.\n"
+         "2. Sellar: Preparar y desplazar baches con material obturante LCM (fibras, micas o carbonato de calcio).\n"
+         "3. Mitigacion de Kick: Vigilar que la caida de nivel no desestabilice zonas superiores con gas."),
+        
+        ("SEGURIDAD OPERATIVA ANTE GAS TOXICO (H2S PROTOCOL)", 
+         "1. Alerta (10 ppm): Uso de monitores portatiles, elevar pH del lodo > 10 e inyectar secuestrantes de sulfuro.\n"
+         "2. Emergencia (20 ppm): Suspender operaciones y colocarse equipos de respiracion autonoma (SCBA) de inmediato.\n"
+         "3. Evacuacion: Dirigirse a los puntos de encuentro (Muster Points) siempre en direccion contraria al viento."),
+        
+        ("CONTROL DE SURGENCIAS POR GAS MIGRATORIO", 
+         "1. Sintoma: Aumento lineal y continuo de presiones (SICP/SIDPP) con bombas totalmente apagadas.\n"
+         "2. Margen: Permitir un incremento controlado de presion superficial (colchon de seguridad de 50-100 psi).\n"
+         "3. Expansion: Purgar pequenos volumenes de lodo por el Choke para permitir que el gas se expanda al subir.\n"
+         "4. Destino: Desviar el flujo hacia el separador de gas (Pobre Boy) una vez que el influjo llegue a superficie."),
+        
+        ("FALLA DE BOMBAS DURANTE EL CONTROL DE POZO", 
+         "1. Accion Inmediata: Cerrar el Choke manual en sincronia con el apagado de la bomba para atrapar la presion.\n"
+         "2. Compensacion: Reemplazar la perdida de presion por friccion anular aplicando contrapresion (Backpressure).\n"
+         "3. Aislamiento: Bloquear valvulas del manifold y aplicar protocolo LOTO para la reparacion segura de la bomba.\n"
+         "4. Redundancia: Alinear la bomba secundaria para reiniciar el proceso de ahogo segun la tabla de presiones."),
+        
+        ("OPERACIONES BAJO VIENTOS EXTREMOS (VIENTO ZONDA)", 
+         "1. Alerta Amarilla (60 km/h): Suspender trabajos no esenciales. Descenso inmediato del Enganchador de la contrapercha.\n"
+         "2. Alerta Roja (90 km/h): Asentar la sarta en las cunas y amarrar firmemente el bloque viajero a la torre.\n"
+         "3. Evacuacion: Retirar a todo el personal del piso de perforacion y resguardarlo en zonas seguras habilitadas."),
+        
+        ("MANIOBRA ANTE GAS POR CONIFICACION (GAS CONING)", 
+         "1. Identificacion: Deteccion de micro-brotes de gas intermitentes y caida leve en el torque por lodo aligerado.\n"
+         "2. Hidrostatica: Incrementar la densidad del lodo entre 0.2 y 0.3 ppg para frenar el empuje vertical del gas.\n"
+         "3. Dinamica: Reducir las SPM de las bombas para disminuir el drawdown hidraulico en la cara de la roca.\n"
+         "4. Quimica: Monitorear propiedades de filtrado para asegurar un revoque fino y de alta impermeabilidad."),
+        
+        ("ENSAYO DE INTEGRIDAD Y CALCULO DE MAASP (API RP 59)", 
+         "1. Preparacion: Perforar de 3 a 5 metros de formacion nueva debajo del zapato y levantar la herramienta.\n"
+         "2. Ensayo (FIT): Cerrar BOP e inyectar lodo a bajo caudal controlando la relacion Presion-Volumen.\n"
+         "3. Monitoreo: Detener la prueba al alcanzar la presion de diseno estipulada por ingenieria sin fracturar la roca.\n"
+         "4. Aplicacion: Calcular la presion maxima superficial permitida (MAASP) para la densidad de lodo actual."),
+        
+        ("DESCONEXION DE EMERGENCIA EN SARTAS (API RP 17G)", 
+         "1. Diagnostico: Determinar el punto libre mediante perfiles o calculos de estiramiento elastico del acero.\n"
+         "2. Mecanica (Back-Off): Aplicar torque a la izquierda y detonar una microcarga explosiva en la junta libre.\n"
+         "3. Emergencia Extrema: Accionar las cuchillas de cizallamiento (Blind Shear Rams) del BOP para cortar el tubo.\n"
+         "4. Abandono: Sellar hidraulicamente el pozo y desconectar de forma segura el equipo de superficie."),
+        
+        ("METODO DEL INGENIERO - WAIT AND WEIGHT (IWCF/IADC)", 
+         "1. Cierre: Registrar presiones estabilizadas SIDPP/SICP y calcular la densidad de matar (KMW) requerida.\n"
+         "2. Preparacion: Densificar el lodo en los tanques con baritina manteniendo el pozo cerrado de forma hermetica.\n"
+         "3. Planificacion: Disenar la tabla y grafica de caida de presion (ICP a FCP) segun las emboladas acumuladas.\n"
+         "4. Ejecucion: Circular inyectando KMW y ajustando el Choke para mantener la presion de fondo constante."),
+        
+        ("AISLAMIENTO HIDRAULICO DE BARRERAS (API STD 53)", 
+         "1. Redundancia: Mantener de forma obligatoria dos barreras de control independientes (columna de lodo y BOP).\n"
+         "2. Prueba de Presion: Realizar ensayos hidraulicos de baja (250 psi) and alta presion cada 14 o 21 dias.\n"
+         "3. Tiempos (Koomey): El acumulador de presion debe cerrar cualquier preventor ram en menos de 30 segundos.\n"
+         "4. Registro: Archivar de forma obligatoria las cartas graficas de presion para auditoria de entes reguladores."),
+
+        ("MIGRACOIN DE GAS CON SARTA FUERA DEL FONDO (API RP 59)", 
+         "1. Diagnostico: Incremento de presion superficial (SICP) durante una maniobra con la mecha dentro de la caneria.\n"
+         "2. Accion: Armar la valvula de seguridad (TIW) en el piso de perforacion y realizar el cierre duro del BOP.\n"
+         "3. Metodo: Aplicar el Metodo Volumetrico o Metodo de Lubricacion y Purga para sacar el gas de forma segura.\n"
+         "4. Retorno: Reposicionar la sarta en el fondo (Snubbing/Stripping) una vez controlada la presion superficial."),
+        
+        ("CONTROL DE KICK POR METODO DEL PERFORADOR (IWCF / IADC)", 
+         "1. Primera Circulacion: Sacar el influjo del pozo usando el lodo original, manteniendo la SICP constante.\n"
+         "2. Transicion: Cerrar el pozo al salir el brote. Verificar que la SIDPP sea igual a la SICP inicial.\n"
+         "3. Segunda Circulacion: Bombear el lodo de matar (KMW) ajustando el Choke para mantener la FCP constante.\n"
+         "4. Verificacion: Detener bombas y confirmar que las presiones superficiales hayan caido totalmente a cero."),
+        
+        ("MANEJO DE COLAPSO GEOMECANICO DE POZO (ISO 16530-1)", 
+         "1. Sintoma: Incremento abrupto de la presion de bombeo, torque erratico severo y exceso de recortes en zarandas.\n"
+         "2. Hidraulica: Aumentar la viscosidad del lodo (pildora de limpieza) y optimizar el caudal para remover derrumbes.\n"
+         "3. Mecanica: Evitar maniobras bruscas de tension. Mantener rotacion controlada para escariar la zona colapsada.\n"
+         "4. Estabilidad: Incrementar la densidad del lodo para estabilizar quimica y mecanicamente las paredes del pozo."),
+        
+        ("SITUACION DE DESCONTROL DE POZO / BLOWOUT (API STD 53)", 
+         "1. Alerta: Falla total de las barreras con fluidos rompiendo de forma descontrolada hacia la atmosfera.\n"
+         "2. Desvio: Activar el Diverter System de inmediato si el brote ocurre en las etapas iniciales (caneria guia).\n"
+         "3. Mitigacion: Activar de forma remota los arietes de corte (Blind Shear Rams) del BOP para sellar el pozo.\n"
+         "4. Evacuacion: Cortar la energia del equipo (ESD), activar los sistemas contra incendios y evacuar al personal."),
+        
+        ("FALLA DEL SISTEMA DE ACUMULADOR DE PRESION (API STD 53)", 
+         "1. Identificacion: Caida de presion en el banco de botellas del Koomey por debajo de los valores operativos minimos.\n"
+         "2. Redundancia: Activar inmediatamente las bombas neumaticas de respaldo y el sistema de nitrogeno de emergencia.\n"
+         "3. Cierre Manual: Utilizar los mandos manuales alternativos en la consola del perforador si falla el control remoto.\n"
+         "4. Bloqueo: Suspender toda perforacion o maniobra hasta restablecer la presion nominal del sistema hidraulico."),
+        
+        ("MONITOREO DE DESPLAZAMIENTO EN CEMENTACION (API RP 10B-2)", 
+         "1. Control: Medir de forma estricta los barriles bombeados durante el desplazamiento del tapon de cemento.\n"
+         "2. Retorno: Verificar que el volumen de lodo que retorna a las piletas coincida exactamente con el cemento inyectado.\n"
+         "3. Alerta: Si el retorno disminuye o se detiene, declarar perdida de circulacion inducida por peso del cemento.\n"
+         "4. Finalizacion: Monitorear el golpe de presion (Bump Plug) para confirmar que el tapon asento correctamente."),
+        
+        ("OPERACIONES EN ZONAS CON PRESION ANORMAL (IADC WELLSHARP)", 
+         "1. Deteccion: Monitorear la tendencia del ROP (Drilling Break) y el aumento de la temperatura del lodo en el retorno.\n"
+         "2. Evaluacion: Realizar Flow Check ante cualquier cambio drastico en la velocidad de penetracion de la roca.\n"
+         "3. Ajuste: Incrementar de forma preventiva la densidad del lodo para restablecer el margen de sobrebalance seguro.\n"
+         "4. Registro: Actualizar los calculos de la MAASP para el nuevo escenario geologico de alta presion."),
+        
+        ("APRISIONAMIENTO POR KEYSEATING / OJO DE LLAVE (API RP 7G)", 
+         "1. Causa: Desgaste de la caneria por el roce de la sarta en zonas de alta curvatura o micro-doglegs.\n"
+         "2. Sintoma: Atrapamiento mecanico severo que ocurre unicamente al intentar sacar la sarta del pozo (hacia arriba).\n"
+         "3. Accion: Asentar peso inmediatamente (ir hacia abajo) y rotar la herramienta para desenganchar los tubos.\n"
+         "4. Solucion: Utilizar herramientas escariadoras (Keyseat Wipers) en el BHA al repasar los intervalos criticos."),
+        
+        ("PROTECCION CONTRA CAIDAS EN ALTURA (OSHA 1926.501)", 
+         "1. Obligacion: Uso mandatorio de arnes de cuerpo completo para trabajos a una altura superior a 1.8 metros.\n"
+         "2. Anclaje: Conectar la linea de vida doble exclusivamente a puntos estructurales certificados de la torre.\n"
+         "3. Inspeccion: Verificar costuras, hebillas y absorbedores de impacto antes de cada ascenso a la contrapercha.\n"
+         "4. Rescate: Disponer en el piso de un plan de rescate en altura ensayado para accionamiento menor a 5 minutos."),
+        
+        ("MANEJO DE FLUIDOS BASE ACEITE / OBM (ISO 14001 / IADC)", 
+         "1. Control Ambiental: Instalar sistemas de contencion (Drip Pans) debajo del piso y del area de zarandas.\n"
+         "2. Seguridad: Uso obligatorio de guantes de nitrilo, proteccion ocular y trajes quimicos para el personal de piletas.\n"
+         "3. Monitoreo: Vigilar la solubilidad del gas en el lodo base aceite; los brotes tardan mas en verse en superficie.\n"
+         "4. Disposicion: Almacenar los recortes contaminados en contenedores estancos segun la normativa ambiental vigente."),
+
+        ("REGISTRO DE PARAMETROS DE PERFORACION (API RP 31A)", 
+         "1. Monitoreo: Registrar en tiempo real ROP, WOB, RPM, torque, presion de bomba y caudal de retorno.\n"
+         "2. Linea Base: Establecer los valores normales de operacion para la formacion geologica en transito.\n"
+         "3. Deteccion: Identificar desvios sutiles que anticipen problemas como embotamiento de mecha o cambios de presion.\n"
+         "4. Archivo: Almacenar los datos en formato estandarizado (WITSML) para el analisis de ingenieria de la operadora."),
+        
+        ("CONTROL DE KICK EN POZOS HORIZONTALES (IWCF AVANZADO)", 
+         "1. Comportamiento: El gas no se expande significativamente mientras migra por la seccion 100 por ciento horizontal.\n"
+         "2. Monitoreo: El brote solo mostrara una expansion critica al ingresar a la seccion curva (KOP) hacia la superficie.\n"
+         "3. Desplazamiento: Mantener caudales de circulacion optimos para evitar que el gas se desplace por el \"high side\" del tubo.\n"
+         "4. Ajuste: Extremar la precision en el manejo del Choke durante la transicion de la curva a la vertical."),
+        
+        ("CEMENTACION DE REMEDIO O RESCATE / SQUEEZE (API RP 10B-2)", 
+         "1. Diagnostico: Confirmar falla en la cementacion primaria mediante registro CBL/VDL o presencia de presion anular.\n"
+         "2. Inyeccion: Bombear una lechada de cemento de alta presion hacia las microfracturas o canales del espacio anular.\n"
+         "3. Desplazamiento: Controlar el volumen exacto para forzar el cemento sin generar un atrapamiento dentro de los tubos.\n"
+         "4. Evaluacion: Esperar el tiempo de fraguado (WOC) y realizar un ensayo hidraulico para validar el aislamiento."),
+        
+        ("OPERACIONES DE DESVIO DE POZO / SIDE-TRACK (IADC)", 
+         "1. Causa: Abandono de una seccion de pozo colapsada o necesidad geologica de redigirigir la trayectoria.\n"
+         "2. Tapon: Colocar un tapon de cemento de alta resistencia (High-Density Cement Plug) en la zona de desvio.\n"
+         "3. Mecanica: Bajar un ensanchador o herramienta de desvio (Whipstock) para forzar a la mecha a cortar la pared exterior.\n"
+         "4. Control: Perforar con parametros de bajo WOB y alta RPM hasta asegurar que la nueva trayectoria salio del pozo original."),
+        
+        ("INSPECCION Y FATIGA DE LA SARTA DE PERFORACION (API RP 7G-2)", 
+         "1. Registro: Llevar la contabilidad estricta de las horas rotativas acumuladas por cada tubo del BHA y de la sarta.\n"
+         "2. Ensayos (NDT): Realizar inspecciones por particulas magneticas y ultrasonido para detectar microfisuras en las roscas.\n"
+         "3. Rotacion: Clasificar y rotar de posicion los tubos (Premium Class) para distribuir los esfuerzos de flexion.\n"
+         "4. Descarte: Retirar de servicio inmediato cualquier componente que muestre una reduccion de pared superior al limite API."),
+        
+        ("MANEJO DE EVENTOS DE VIBRACION SEVERA (IADC DRILLING MANUAL)", 
+         "1. Identificacion: Detectar vibracion de torsion (Stick-Slip), rebote vertical (Bit Bounce) o remolino (Whirl).\n"
+         "2. Mitigacion: Modificar de forma inmediata la combinacion de RPM y WOB para salir de la frecuencia de resonancia.\n"
+         "3. Quimica: Incrementar la lubricidad del lodo mediante aditivos para reducir la friccion mecha-roca.\n"
+         "4. Reduccion: Si el evento persiste, levantar de fondo para evitar la rotura de los cortadores PDC o del MWD."),
+        
+        ("PROTOCOLO ANTE PRESENCIA DE ARCILLAS REACTIVAS (ISO 13500)", 
+         "1. Sintoma: Incremento de torque, arrastre en maniobras (Drag) and embolamiento de la mecha por arcillas hinchables.\n"
+         "2. Inhibicion: Adicionar potasio (KCl) o glicoles al lodo para estabilizar quimicamente las capas de arcilla shale.\n"
+         "3. Mecanica: Realizar viajes de limpieza (Wiper Trips) periodicos para calibrar las zonas con tendencia al cierre.\n"
+         "4. Control: Mantener el filtrado del lodo al minimo para evitar la hidratacion profunda de la roca expuesta."),
+        
+        ("MANIOBRA DE REPASO Y ESCARIADO DE POZO / REAMING (API)", 
+         "1. Criterio: Se ejecuta al bajar la herramienta si se detectan restricciones o puentes de lodo en el pozo.\n"
+         "2. Parametros: Avanzar rotando a baja velocidad (RPM) y con caudales maximos de bomba para limpiar los escombros.\n"
+         "3. Control: Nunca forzar la sarta hacia abajo (no aplicar peso de embolo) si la herramienta se detiene bruscamente.\n"
+         "4. Seguridad: Si el torque se eleva al doble del valor base, levantar sarta y limpiar el intervalo circulando."),
+        
+        ("MONITOREO DE ESPACIO ANULAR ABIERTO / SUNDRY NOTICES", 
+         "1. Evaluacion: Verificar de forma visual y con sensores que no existan microanuncios de gas en el area de la subestructura.\n"
+         "2. Ventilacion: Mantener activos los extractores e inyectores de aire forzado a prueba de explosion en el piso del Rig.\n"
+         "3. Calibracion: Realizar pruebas de disparo atmosferico de los sensores de gas de forma diaria antes de cada turno.\n"
+         "4. Clausura: Suspender trabajos calientes (soldadura) de forma automatica ante lecturas superiores al 10 por ciento del LEL."),
+        
+        ("PROTOCOLO DE ABANDONO SEGURO DEL POZO / PLUG & ABANDON (API BUL 10C)", 
+         "1. Criterio: Sellado permanente del pozo al finalizar su vida util o por inviabilidad comercial, segun normas ambientales.\n"
+         "2. Barreras: Colocar tapones de cemento mecanicos e hidraulicos frente a cada zona productora y acuiferos de agua fresca.\n"
+         "3. Prueba: Validar la hermeticidad de cada tapon mediante ensayos de presion (Inflow Test) y asentamiento de peso.\n"
+         "4. Superficie: Cortar las canerias de revestimiento a una profundidad minima de 2 metros bajo el nivel del suelo y soldar tapa."),
+
+        ("DETECCION DE AGUJERO REDUCIDO / UNDERGAUGE HOLE (API)", 
+         "1. Causa: Desgaste abrasivo del diametro externo de la mecha o estabilizadores al perforar rocas muy duras.\n"
+         "2. Riesgo: Al bajar una mecha nueva con el diametro nominal correcto, esta puede acuñarse y pegarse en el tramo estrecho.\n"
+         "3. Procedimiento: Detener la bajada de la sarta varios tiros antes de la profundidad de la mecha anterior.\n"
+         "4. Mitigacion: Repasar el ultimo tramo perforado rotando a baja velocidad y con maximo caudal antes de tocar el fondo."),
+        
+        ("CONTROL DE KICK CON TUBERIA FUERA DEL POZO / VOLUMETRIC (IWCF)", 
+         "1. Desafio: Entrada de un influjo cuando no hay sarta dentro del pozo, impidiendo la circulacion convencional.\n"
+         "2. Cierre: Efectuar el cierre total e inmediato del pozo utilizando los arietes ciegos (Blind Rams) del BOP.\n"
+         "3. Control: Monitorear la presion superficial y aplicar el Metodo Volumetrico estricto para manejar la expansion del gas.\n"
+         "4. Resolucion: Esperar a que el gas migre a superficie para purgarlo o forzar la sarta hacia adentro (Snubbing)."),
+        
+        ("OPERACIONES DE PESCA DE HERRAMIENTAS / FISHING (IADC)", 
+         "1. Condicion: Rotura mecanica o desprendimiento de un componente de la sarta, dejando un 'pescado' dentro del pozo.\n"
+         "2. Preparacion: Medir con exactitud la geometria del tope del pescado mediante una impresion de plomo (Impression Block).\n"
+         "3. Captura: Bajar la herramienta de pesca adecuada (Overshot, Tap o Spear) y enganchar el tope de forma mecanica.\n"
+         "4. Extraccion: Aplicar tension controlada y activar martillos de pesca para liberar y sacar el componente del pozo."),
+        
+        ("PROTOCOLO ANTE PERDIDA DE ENERGIA TOTAL / BLACKOUT (ISO 16530)", 
+         "1. Sintoma: Falla simultanea de los generadores principales del equipo, quedando el Rig a oscuras y sin potencia.\n"
+         "2. Seguridad: El perforador debe aplicar inmediatamente el freno mecanico de emergencia para asegurar el bloque viajero.\n"
+         "3. Cierre: Cerrar el pozo de forma preventiva utilizando la presion acumulada en las botellas del sistema Koomey.\n"
+         "4. Restablecimiento: Encender el generador de emergencia para alimentar sistemas criticos de control y sensores de gas."),
+        
+        ("COLOCACION DE TAPONES DE CEMENTO POR BALANCE (API RP 10B-2)", 
+         "1. Diseno: Calcular de forma exacta los volumenes de lodo, espaciador y lechada para lograr un equilibrio hidrostatico.\n"
+         "2. Inyeccion: Bombear el cemento a traves de la tuberia hasta que la altura en el anular y en el tubo sea identica.\n"
+         "3. Retirada: Sacar la sarta del pozo de forma extremadamente lenta (mecanica suave) para no disipar o romper el tapon.\n"
+         "4. Lavado: Realizar una circulacion inversa por encima del tope teorico del cemento para limpiar los excesos de lechada."),
+        
+        ("GESTION DE ARRASTRE EXCESIVO / HIGH DRAG MANAGEMENT (API RP 7G)", 
+         "1. Sintoma: Resistencia severa al levantar o bajar la sarta de perforacion, superando los limites elasticos del acero.\n"
+         "2. Diagnostico: Determinar si el arrastre es por mala limpieza del pozo (cama de recortes) o por problemas de torque.\n"
+         "3. Accion: Detener la maniobra de viaje, volver al fondo circulando a maximo caudal y rotar la sarta para romper la cama.\n"
+         "4. Optimizacion: Adicionar lubricantes liquidos al sistema de lodo para disminuir el coeficiente de friccion mecanica."),
+        
+        ("CONTROL DE SURGENCIAS EN PERFORACION BAJO PRESION / MPD (IADC)", 
+         "1. Principio: Perforar utilizando un sistema cerrado y presurizado con un cabezal de control rotativo (RCD).\n"
+         "2. Ajuste: Ante un micro-influjo, incrementar la contrapresion superficial (Anchor Backpressure) usando el Choke automatico.\n"
+         "3. Ventaja: Permite detener la entrada de fluidos de la formacion de forma instantanea sin necesidad de cerrar el BOP.\n"
+         "4. Operacion: Continuar la perforacion controlando el gradiente dinamico dentro de la ventana operativa segura."),
+        
+        ("PROTOCOLO DE SEGURIDAD EN EL MANIFOLD DE ESTRANGULACION (API STD 53)", 
+         "1. Inspeccion: Verificar diariamente que las valvulas de bloqueo y los Chokes manuales/hidraulicos esten alineados.\n"
+         "2. Redundancia: Mantener siempre una via de flujo alternativa (Choke de respaldo) libre y lista para ser operada.\n"
+         "3. Desgaste: Monitorear caidas de presion anomalas que indiquen erosion interna (Washout) en los componentes del manifold.\n"
+         "4. Operacion: Queda prohibido el aislamiento de las lineas de purga mientras el pozo se encuentre en alerta de control."),
+        
+        ("OPERACIONES DE ENSANCHAMIENTO DE POZO / HOLE ENLARGEMENT (ISO)", 
+         "1. Proposito: Incrementar el diametro del pozo por debajo de una restriccion utilizando herramientas abridores (Underreamers).\n"
+         "2. Mecanica: Activar los brazos cortadores de la herramienta mediante presion hidraulica (caudal de bombeo de lodo).\n"
+         "3. Control: Monitorear el torque reactivo y el ROP para asegurar que los brazos cortadores abrieron por completo.\n"
+         "4. Verificacion: Realizar una carrera de calibracion antes de proceder a la bajada de la nueva cañeria de revestimiento."),
+        
+        ("PRUEBAS DE HERMETICIDAD DE BARRERAS MECANICAS / INFLOW TEST (API)", 
+         "1. Concepto: Evaluar la capacidad de un tapon mecanico o caneria para contener la presion desde la formacion hacia el pozo.\n"
+         "2. Metodo: Reducir de forma controlada la presion hidrostatica por encima de la barrera (creando un escenario de sub-balance).\n"
+         "3. Monitoreo: Aislar el pozo y observar los manometros de superficie durante un tiempo minimo de 30 minutos continuos.\n"
+         "4. Aprobacion: La prueba es exitosa si la presion permanece en cero, confirmando que no hay flujo a traves de la barrera.")
+    ]
+
+    # Iteramos y agregamos de forma dinamica los 34 protocolos al PDF
+    for titulo, pasos in procedimientos:
+        pdf.set_font('Arial', 'B', 11)
+        pdf.cell(0, 7, f"- {titulo}:", 0, 1) 
+        pdf.set_font('Arial', '', 10)
+        pdf.multi_cell(0, 6, pasos, align='J') 
+        pdf.ln(3)
+
+
+    # =========================================================================
+    # --- 7. FORMULARIO TÉCNICO INTEGRAL ---
+    # =========================================================================
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "6. FORMULARIO DE INGENIERIA AVANZADO", 0, 1, 'C')
+    pdf.ln(5)
+    pdf.set_text_color(0, 0, 0)
+    
+    formulas_maestras = [
+        "Presion en el Fondo (BHP): BHP = Ph + SIDPP (en cierre)",
+        "Densidad de Matar (KMW): (SIDPP / (0.052 x TVD)) + Densidad Actual",
+        "Presion Inicial de Circulacion (ICP): ICP = SIDPP + SCR",
+        "Presion Final de Circulacion (FCP): FCP = SCR x (KMW / Densidad Actual)",
+        "Presion Maxima de Cierre (MAASP): (Grad. Fractura - Grad. Lodo) x TVD Zapato",
+        "Gradiente del Influjo (psi/ft): [SICP - SIDPP] / Altura Influjo (ft)",
+        "Capacidad de Tuberia (bbl/ft): ID^2 / 1029.4",
+        "Volumen de Fondo (bbl): Capacidad (bbl/ft) x Longitud (ft)",
+        "Velocidad Anular (ft/min): (24.5 x Caudal [gpm]) / (Dh^2 - Dp^2)",
+        "Area Total de Boquillas (TFA): (Boquilla1^2 + Boquilla2^2 + ...) / 1303.8",
+        "Fuerza de Impacto Hidraulico (lb): (Caudal x Densidad x Vel. Jet) / 1930",
+        "Caudal Real (gpm): Desplazamiento Teorico x Eficiencia Volumetrica",
+        "Factor de Flotacion (FF): (65.5 - Densidad Lodo [ppg]) / 65.5",
+        "Peso de la Sarta en Lodo: Peso en Aire x Factor de Flotacion",
+        "Margen de Tension (MOP): Resistencia a la Cedencia - Peso de la Sarta",
+        "Punto Neutro (ft desde mecha): WOB / (Peso unitario DC x FF)",
+        "Tension Maxima Permitida (lb): Resistencia Cedencia x 0.9",
+        "Tiempo de Ciclo Total (min): Emboladas Totales / Velocidad Bomba (spm)",
+        "Relacion de Compresion: Presion de Salida / Presion de Entrada",
+        "Exceso de Presion (Overbalance): BHP - Presion de Poro"
+    ]
+
+    for f in formulas_maestras:
+        pdf.set_font('Arial', '', 10)
+        pdf.set_fill_color(252, 252, 252) 
+        pdf.multi_cell(0, 8, f, border=1, align='C', fill=True)
+        pdf.ln(2)
+
+    # =========================================================================
+    # --- 8. LOS 100 TIPS DE ORO ---
+    # =========================================================================
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "7. LOS 100 TIPS DE ORO DEL PERFORADOR", 0, 1, 'C')
+    pdf.ln(5)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', '', 8.5)
+    
+    tips = [
+        "1. SEGURIDAD: Verifique el freno de emergencia al iniciar el turno.",
+        "2. OPERATIVO: Aumento de torque indica cambio de formacion o mecha embotada.",
+        "3. CONTROL: Nunca saque tuberia sin llenar el pozo con lodo.",
+        "4. GEOLOGIA: El gas en el retorno es la primera alarma de un reservorio.",
+        "5. FLUIDOS: Filtrado bajo evita desmoronamiento de la pared del pozo.",
+        "6. MENDOZA: Asegure el cemento de la guia para proteger acuiferos.",
+        "7. MECANICA: Limpie y engrase siempre las roscas de la sarta.",
+        "8. CONTROL: Ante la duda de flujo: ¡CIERRE EL POZO!",
+        "9. BOMBAS: Caida de presion puede ser un washout en la tuberia.",
+        "10. EQUIPO: Use senales estandarizadas con el enganchador.",
+        "11. DIRECCIONAL: El Toolface es tu volante; orientalo bien antes de deslizar.",
+        "12. GEONAVEGACION: Gamma Ray alto indica salida a zona de arcillas.",
+        "13. OPERATIVO: Monitorea la presion diferencial para no plantar el motor.",
+        "14. DIRECCIONAL: Controla el DLS para evitar fatiga en los tubos.",
+        "15. GEONAVEGACION: La profundidad medida (MD) siempre es mayor al TVD.",
+        "16. TECNICO: Un Side Track requiere un tapon de cemento de alta resistencia.",
+        "17. DIRECCIONAL: La gravedad hace que la mecha 'camine' a la derecha.",
+        "18. GEONAVEGACION: Comparar con pozos vecinos ayuda a anticipar topes.",
+        "19. OPERATIVO: Estabilizadores variables permiten ajustar inclinacion.",
+        "20. DIRECCIONAL: Evita micro-doglegs; dificultan bajar el casing.",
+        "21. TECNICO: RSS permite dirigir mientras la sarta rota continuamente.",
+        "22. GEONAVEGACION: Sensores de resistividad detectan contactos agua-petroleo.",
+        "23. OPERATIVO: Durante sliding, la limpieza baja; circula a fondo.",
+        "24. DIRECCIONAL: El Azimut es tu direccion cardinal; mantenelo bajo control.",
+        "25. SEGURIDAD: Riesgo de Key Seating aumenta en curvas cerradas.",
+        "26. GEONAVEGACION: El buzamiento (Dip Angle) afecta la estrategia.",
+        "27. TECNICO: Calibra sensores magneticos lejos de estructuras metalicas.",
+        "28. OPERATIVO: Arrastre excesivo indica necesidad de mejorar el lodo.",
+        "29. DIRECCIONAL: Build rate es tu capacidad de ganar angulo.",
+        "30. COMUNICACION: El geologo y el perforador deben hablar constantemente.",
+        "31. WELL CONTROL: El flow show es la primera senal de un Kick.",
+        "32. TECNICO: SIDPP indica diferencia entre hidrostatica y formacion.",
+        "33. OPERATIVO: Si fluye con bombas apagadas, haga cierre duro.",
+        "34. WELL CONTROL: La burbuja de gas se expande al subir; SICP subira.",
+        "35. SEGURIDAD: Nunca excedas la MAASP; romperas el zapato.",
+        "36. TECNICO: Metodo del Perforador requiere dos circulaciones.",
+        "37. OPERATIVO: Esperar y Pesar mata el pozo en una sola vuelta.",
+        "38. WELL CONTROL: Mantenga presion de fondo (BHP) constante al circular.",
+        "39. SEGURIDAD: Verifique el Koomey cada turno; es su vida.",
+        "40. TECNICO: Use el Pobre Boy para separar gas si llega a superficie.",
+        "41. WELL CONTROL: Pit Gain es el indicador de volumen mas confiable.",
+        "42. OPERATIVO: El choke es tu herramienta para regular la presion.",
+        "43. TECNICO: El influjo de agua salada es dificil de detectar.",
+        "44. SEGURIDAD: Realice Pit Drills con su cuadrilla semanalmente.",
+        "45. WELL CONTROL: ICP es la suma de friccion mas el SIDPP.",
+        "46. TECNICO: Calcule la densidad de matar (KMW) antes de circular.",
+        "47. OPERATIVO: Si presiones suben, el gas migra; purgue segun tabla.",
+        "48. SEGURIDAD: Personal no esencial evacua en control critico.",
+        "49. WELL CONTROL: Use el Trip Tank en todas las maniobras.",
+        "50. MENDOZA: Alerta al ROP Break; presion de formacion anormal.",
+        "51. FLUIDOS: Viscosidad Marsh indica capacidad de acarreo.",
+        "52. TECNICO: Filtrado alto genera revoque grueso y pegamiento.",
+        "53. OPERATIVO: Use lodos inhibidores en arcillas reactivas locales.",
+        "54. FLUIDOS: Yield Point suspende recortes en bombas apagadas.",
+        "55. SEGURIDAD: Use EPP completo al manejar soda caustica.",
+        "56. TÉCNICO: Controle densidad cada 15 min; caida dispara Kick.",
+        "57. OPERATIVO: Exceso de finos aumenta torque y desgasta bombas.",
+        "58. FLUIDOS: En OBM el gas se disuelve; mas dificil de ver.",
+        "59. TECNICO: pH entre 9 y 10.5 previene corrosion de tuberia.",
+        "60. SEGURIDAD: H2S es letal; use equipo autonomo de inmediato.",
+        "61. FLUIDOS: Fuerza de gel suspende solidos en conexiones.",
+        "62. OPERATIVO: Haga pildora pesada antes de sacar herramienta.",
+        "63. TECNICO: Combata perdida de circulacion con material LCM.",
+        "64. FLUIDOS: Arena menor al 0.5% evita erosion de boquillas.",
+        "65. SEGURIDAD: Mantenga hojas MSDS visibles en la cabina.",
+        "66. TECNICO: En horizontal, use caudales altos para limpieza.",
+        "67. OPERATIVO: Olor a huevo podrido indica presencia de H2S.",
+        "68. FLUIDOS: Desgasificar lodo es critico despues de un Kick.",
+        "69. TECNICO: Lodo sobredensificado puede causar arremetida inducida.",
+        "70. MENDOZA: Trate recortes segun normativa ambiental local.",
+        "71. BHA: Drill collars dan el peso; no use la tuberia fina.",
+        "72. TECNICO: Use estabilizadores para controlar la tendencia.",
+        "73. OPERATIVO: Haga shifting para evitar pegamiento diferencial.",
+        "74. PESCA: Tome impresion con bloque de plomo antes de bajar.",
+        "75. TECNICO: Martillos (jars) deben tener espacio para actuar.",
+        "76. BHA: Verifique diametro de mecha con calibrador antes de bajar.",
+        "77. PESCA: Sepa cuando detenerse; a veces Side-track es mejor.",
+        "78. OPERATIVO: Torque erratico y caida de peso indican twist-off.",
+        "79. TECNICO: HWDP sirve como zona de transicion de esfuerzos.",
+        "80. BHA: Jets de la mecha limpian el fondo hidraulicamente.",
+        "81. PESCA: Overshot requiere grapples del tamano exacto.",
+        "82. TECNICO: Lleve registro de horas; la fatiga es invisible.",
+        "83. OPERATIVO: Use Monel (no magnetico) cerca del MWD.",
+        "84. BHA: Mecha PDC es para ROP alta pero sensible a vibracion.",
+        "85. PESCA: Mantenga circulacion minima sobre el pescado.",
+        "86. TECNICO: Punto Neutro debe caer en portamechas o HWDP.",
+        "87. BHA: Escariadores mantienen el pozo en calibre.",
+        "88. PESCA: Spear agarra por dentro si el tope externo fallo.",
+        "89. OPERATIVO: Vibraciones danan electronica y cortadores.",
+        "90. MENDOZA: Shock Subs protegen BHA en pozos profundos.",
+        "91. TERMINACION: Lodo de completacion debe estar bien filtrado.",
+        "92. TECNICO: Cementacion primaria asegura la vida del pozo.",
+        "93. OPERATIVO: Viaje de limpieza antes de bajar el casing.",
+        "94. SEGURIDAD: Si el retorno para en cementacion, hay perdida.",
+        "95. TECNICO: Centralizadores aseguran anillo de cemento uniforme.",
+        "96. PRUEBA: Haga Leak-off Test despues de cementar el zapato.",
+        "97. OPERATIVO: Registro CBL/VDL confirma adherencia del cemento.",
+        "98. SEGURIDAD: Nunca deje el pozo abierto a la atmosfera.",
+        "99. TECNICO: Minimice Skin Effect con fluidos compatibles.",
+        "100. MENFA: La capacitacion continua es su mejor herramienta."
+    ]
+
+    for t in tips:
+        pdf.multi_cell(0, 5, t, 0, 'L')
+        pdf.ln(1)
+
+    # =========================================================================
+    # --- 9. TABLA DE CONVERSIONES CRÍTICAS ---
+    # =========================================================================
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 10, "8. TABLA DE CONVERSIONES CRITICAS", 0, 1, 'C')
+    pdf.ln(5)
+    
+    conversions = [
+        ["Metros (m)", "Pies (ft)", "x 3.2808"],
+        ["Pulgadas (in)", "Milimetros (mm)", "x 25.4"],
+        ["Kilometros (km)", "Millas (mi)", "x 0.6214"],
+        ["Barriles (bbl)", "Metros Cubicos (m3)", "x 0.1589"],
+        ["Galones (gal)", "Barriles (bbl)", "/ 42"],
+        ["Barriles (bbl)", "Litros (L)", "x 158.98"],
+        ["Barriles/Pie (bbl/ft)", "m3/m", "x 0.5216"],
+        ["Libras (lb)", "Kilogramos (kg)", "x 0.4536"],
+        ["PPG (lb/gal)", "gr/cm3 (SG)", "x 0.1198"],
+        ["PPG (lb/gal)", "PSI/ft (Gradiente)", "x 0.052"],
+        ["Libras/Pie (lb/ft)", "kg/m", "x 1.4882"],
+        ["PSI", "Bar", "x 0.0689"],
+        ["PSI", "kg/cm2", "x 0.0703"],
+        ["PSI", "Kilopascales (kPa)", "x 6.8947"],
+        ["Libras (lb fuerza)", "Decanewtons (daN)", "x 0.4448"],
+        ["GPM (gal/min)", "LPM (litros/min)", "x 3.785"],
+        ["ft-lb (Torque)", "N-m (Newton-Metro)", "x 1.3558"],
+        ["ft-lb (Torque)", "m-kg", "x 0.1383"],
+        ["HP (Horsepower)", "Kilowatts (kW)", "x 0.7457"],
+        ["Celsius (C)", "Fahrenheit (F)", "x 1.8 + 32"]
+    ]
+    
+    col_width = 56.6
+    
+    # Encabezado de Tabla Estilizado
+    pdf.set_fill_color(0, 51, 102)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font('Arial', 'B', 10)
+    pdf.cell(col_width, 10, "DATO ORIGEN", 1, 0, 'C', fill=True)
+    pdf.cell(col_width, 10, "A CONVERTIR", 1, 0, 'C', fill=True)
+    pdf.cell(col_width, 10, "OPERACION", 1, 1, 'C', fill=True)
+    
+    # Filas de la Tabla
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font('Arial', '', 9)
+    for row in conversions:
+        pdf.cell(col_width, 8, row[0], 1, 0, 'C')
+        pdf.cell(col_width, 8, row[1], 1, 0, 'C')
+        pdf.set_font('Arial', 'B', 9)
+        pdf.cell(col_width, 8, row[2], 1, 1, 'C')
+        pdf.set_font('Arial', '', 9)
+        
+    return bytes(pdf.output(dest='S'))
+
+# --- INTERFAZ COMPATIBLE CON STREAMLIT ---
+
+@st.cache_data(show_spinner="Compilando Manual Maestro de MENFA...")
+def _obtener_bytes_manual():
+    """Función interna con caché para evitar compilar el PDF en cada re-run de la app"""
+    return generar_manual_completo()
+
+def mostrar_manual_sidebar():
+    """Renderiza el boton de descarga directo en el sidebar de app.py sin generar latencia"""
+    st.markdown("### 📖 Manual Maestro 3.0")
+    st.write("Acceda a los protocolos tecnicos y descargue el manual completo de MENFA en formato PDF.")
+    
+    try:
+        # Streamlit busca en caché; si ya se generó antes, la respuesta es instantánea (0 ms)
+        pdf_data = _obtener_bytes_manual()
+        
+        st.download_button(
+            label="📥 Descargar Manual Maestro (PDF)",
+            data=pdf_data,
+            file_name="Manual_Maestro_MENFA_3.0.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"Error al compilar el PDF: {e}")
