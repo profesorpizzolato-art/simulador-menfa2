@@ -472,7 +472,8 @@ def mostrar_simulador():
         modulo_direccional()
     with t4:
         modulo_escenario()
-
+   with t5:
+        modulo_manual()
 
 if __name__ == "__main__":
     st.set_page_config(page_title="Simulador MENFA", page_icon="🛢️", layout="wide")
