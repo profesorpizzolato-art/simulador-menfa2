@@ -6,8 +6,9 @@ Modulos:
   3. Perforacion direccional (Rotacion / Deslizando, Toolface, DLS)
   4. Escenarios de control (kick perforando, kick en viaje con Trip Tank, gas migratorio)
      con dibujo del equipo y de la sala de control
+  5. Manual Maestro (consultas y guía del usuario)
 
-Uso standalone:  streamlit run simulador_menfa.py
+Uso standalone: streamlit run simulador_menfa.py
 Uso desde app.py: from simulador_menfa import mostrar_simulador; mostrar_simulador()
 """
 import math
@@ -458,12 +459,56 @@ def modulo_escenario():
 
 
 # ----------------------------------------------------------------------------
+# MODULO 5: MANUAL MAESTRO DE PERFORACIÓN 3.0
+# ----------------------------------------------------------------------------
+def modulo_manual():
+    st.subheader("Manual Maestro de Perforación 3.0")
+    st.markdown("""
+    ### Guía Rápida y Fórmulas
+    
+    #### 1. Hidráulica y Sarta
+    - **Factor de Flotación ($FF$):**  
+      $$FF = \\frac{65.5 - MW}{65.5}$$
+    - **Presión Hidrostática en Fondo ($BHP$):**  
+      $$BHP = 0.052 \\times MW \\times TVD$$
+    - **Densidad Equivalente de Circulación ($ECD$):**  
+      $$ECD = MW + \\frac{\\Delta P_{anular}}{0.052 \\times TVD}$$
+    - **Punto Neutro:**  
+      $$Punto\\ Neutro = \\frac{WOB}{W_{DC} \\times FF}$$
+    
+    ---
+    
+    #### 2. Control de Pozos
+    - **Densidad del Lodo de Ahogo ($KMW$):**  
+      $$KMW = \\frac{SIDPP}{0.052 \\times TVD} + MW$$
+    - **Presión Inicial de Circulación ($ICP$):**  
+      $$ICP = SIDPP + SCR$$
+    - **Presión Final de Circulación ($FCP$):**  
+      $$FCP = SCR \\times \\frac{KMW}{MW}$$
+    - **Presión Máxima Admisible en Anular ($MAASP$):**  
+      $$MAASP = 0.052 \\times (EMW_{frac} - MW) \\times TVD_{zapato}$$
+    
+    ---
+    
+    #### 3. Métodos Operativos
+    - **Cierre Duro:** Ante una ganancia en piletas (*Pit Gain*), detener bombas, espaciar la sarta, cerrar el BOP anular/ariete y abrir la HCR.
+    - **Método Volumétrico (Gas Migratorio):** Mantener la BHP constante permitiendo la expansión controlada del gas mediante el purgado paulatino por el *choke*.
+    """)
+
+
+# ----------------------------------------------------------------------------
 # ENTRADA PRINCIPAL
 # ----------------------------------------------------------------------------
 def mostrar_simulador():
     st.title("Simulador Integral MENFA")
     st.caption("Basado en el Manual Maestro de Perforación 3.0 · Material educativo")
-    t1, t2, t3, t4 = st.tabs(["Hidráulica y sarta", "Control de pozos", "Direccional", "Escenarios de control"])
+    t1, t2, t3, t4, t5 = st.tabs([
+        "Hidráulica y sarta",
+        "Control de pozos",
+        "Direccional",
+        "Escenarios de control",
+        "Manual Maestro"
+    ])
     with t1:
         modulo_hidraulica()
     with t2:
@@ -472,8 +517,9 @@ def mostrar_simulador():
         modulo_direccional()
     with t4:
         modulo_escenario()
-   with t5:
+    with t5:
         modulo_manual()
+
 
 if __name__ == "__main__":
     st.set_page_config(page_title="Simulador MENFA", page_icon="🛢️", layout="wide")
