@@ -1,5 +1,5 @@
 """
-Simulador Integral MENFA - basado en el Manual Maestro de Perforacion 3.0
+PERFORACION MENFA - basado en el Manual Maestro de Perforacion 3.0
 Modulos:
   1. Hidraulica y mecanica de sarta (FF, Hook Load, BHP, ECD, Punto Neutro)
   2. Control de pozos (KMW, ICP, FCP, MAASP, influjo, tabla de presiones)
